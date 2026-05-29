@@ -5,7 +5,7 @@ import { Analytics } from '@vercel/analytics/next'
 
 import './globals.css'
 
-import { Sidebar } from '@/components/sidebar'
+import { AuthGuard } from '@/components/auth-guard'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -67,9 +67,9 @@ export default function RootLayout({
 
       <body className="font-sans antialiased">
 
-        <Sidebar>
+        <AuthGuard>
           {children}
-        </Sidebar>
+        </AuthGuard>
 
         {process.env.NODE_ENV === 'production' && (
           <Analytics />
