@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,17 +24,17 @@ import {
   Loader2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { generateAIResponse, analyzeDocument, type UploadedCase, type FraudAnalysis } from '@/lib/fraud-analyzer'
+import { analyzeDocument, type UploadedCase, type FraudAnalysis } from '@/lib/fraud-analyzer'
 
 const PREGUNTAS_SUGERIDAS = [
-  "Cuales son los 10 siniestros con mayor riesgo de posible fraude?",
-  "Que proveedores concentran mas alertas rojas?",
-  "Que ramos tienen mayor porcentaje de casos sospechosos?",
-  "Que sucursales presentan mayor concentracion de alertas?",
-  "Genera un resumen ejecutivo de los casos criticos.",
-  "Que patrones se repiten en los reclamos sospechosos?",
-  "Recomienda que casos deberia revisar primero el analista.",
-  "Explica la metodologia de scoring utilizada.",
+  'Cuales son los 10 siniestros con mayor riesgo de posible fraude?',
+  'Que proveedores concentran mas alertas rojas?',
+  'Que ramos tienen mayor porcentaje de casos sospechosos?',
+  'Que sucursales presentan mayor concentracion de alertas?',
+  'Genera un resumen ejecutivo de los casos criticos.',
+  'Que patrones se repiten en los reclamos sospechosos?',
+  'Recomienda que casos deberia revisar primero el analista.',
+  'Explica la metodologia de scoring utilizada.',
 ]
 
 interface Message {
@@ -40,6 +42,108 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+}
+
+async function requestAIResponse(messages: Message[]): Promise<string> {
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messages: messages.map(message => ({
+        role: message.role,
+        content: message.content,
+      })),
+    }),
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data?.error || 'No se pudo conectar con el agente IA')
+  }
+
+  return data.response || 'No se generó una respuesta del agente IA.'
+}
+
+function MarkdownMessage({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        h1: ({ children }) => (
+          <h1 className="text-lg font-semibold mb-3">
+            {children}
+          </h1>
+        ),
+        h2: ({ children }) => (
+          <h2 className="text-base font-semibold mb-3">
+            {children}
+          </h2>
+        ),
+        h3: ({ children }) => (
+          <h3 className="text-sm font-semibold mt-4 mb-2">
+            {children}
+          </h3>
+        ),
+        p: ({ children }) => (
+          <p className="mb-3 last:mb-0">
+            {children}
+          </p>
+        ),
+        strong: ({ children }) => (
+          <strong className="font-semibold">
+            {children}
+          </strong>
+        ),
+        em: ({ children }) => (
+          <em className="text-muted-foreground">
+            {children}
+          </em>
+        ),
+        ul: ({ children }) => (
+          <ul className="list-disc pl-5 mb-3 space-y-1">
+            {children}
+          </ul>
+        ),
+        ol: ({ children }) => (
+          <ol className="list-decimal pl-5 mb-3 space-y-1">
+            {children}
+          </ol>
+        ),
+        li: ({ children }) => (
+          <li className="leading-relaxed">
+            {children}
+          </li>
+        ),
+        table: ({ children }) => (
+          <div className="my-3 overflow-x-auto rounded-md border border-border">
+            <table className="w-full text-xs">
+              {children}
+            </table>
+          </div>
+        ),
+        thead: ({ children }) => (
+          <thead className="bg-muted/80">
+            {children}
+          </thead>
+        ),
+        th: ({ children }) => (
+          <th className="px-3 py-2 text-left font-semibold border-b border-border whitespace-nowrap">
+            {children}
+          </th>
+        ),
+        td: ({ children }) => (
+          <td className="px-3 py-2 border-b border-border align-top">
+            {children}
+          </td>
+        ),
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  )
 }
 
 export function AIAgentChat() {
@@ -52,70 +156,62 @@ export function AIAgentChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
-    e?.preventDefault()
-    const text = inputValue.trim()
-    if (!text || isLoading) return
+  const sendMessage = useCallback(async (text: string) => {
+    if (!text.trim() || isLoading) return
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: text,
+      content: text.trim(),
       timestamp: new Date()
     }
 
-    setMessages(prev => [...prev, userMessage])
+    const updatedMessages = [...messages, userMessage]
+
+    setMessages(updatedMessages)
     setInputValue('')
     setIsLoading(true)
 
-    // Simular delay de respuesta
-    await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200))
+    try {
+      const aiResponse = await requestAIResponse(updatedMessages)
 
-    const aiResponse = generateAIResponse(text)
-    
-    const assistantMessage: Message = {
-      id: `assistant-${Date.now()}`,
-      role: 'assistant',
-      content: aiResponse,
-      timestamp: new Date()
+      const assistantMessage: Message = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: aiResponse,
+        timestamp: new Date()
+      }
+
+      setMessages(prev => [...prev, assistantMessage])
+    } catch (error) {
+      console.error('Error calling AI agent:', error)
+
+      const assistantMessage: Message = {
+        id: `assistant-error-${Date.now()}`,
+        role: 'assistant',
+        content: 'No pude conectar con el agente IA en este momento. Verifica que la variable GROQ_API_KEY esté configurada en el archivo .env.local o en las variables de entorno del despliegue.',
+        timestamp: new Date()
+      }
+
+      setMessages(prev => [...prev, assistantMessage])
+    } finally {
+      setIsLoading(false)
     }
+  }, [messages, isLoading])
 
-    setMessages(prev => [...prev, assistantMessage])
-    setIsLoading(false)
-  }, [inputValue, isLoading])
+  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    await sendMessage(inputValue)
+  }, [inputValue, sendMessage])
 
   const handleSuggestedQuestion = useCallback((question: string) => {
     if (isLoading) return
-    setInputValue(question)
-    // Trigger submit after state update
-    setTimeout(() => {
-      const userMessage: Message = {
-        id: `user-${Date.now()}`,
-        role: 'user',
-        content: question,
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, userMessage])
-      setIsLoading(true)
-
-      setTimeout(async () => {
-        const aiResponse = generateAIResponse(question)
-        const assistantMessage: Message = {
-          id: `assistant-${Date.now()}`,
-          role: 'assistant',
-          content: aiResponse,
-          timestamp: new Date()
-        }
-        setMessages(prev => [...prev, assistantMessage])
-        setIsLoading(false)
-      }, 800 + Math.random() * 1200)
-    }, 0)
-  }, [isLoading])
+    void sendMessage(question)
+  }, [isLoading, sendMessage])
 
   const clearChat = () => {
     setMessages([])
@@ -130,10 +226,10 @@ export function AIAgentChat() {
     for (const file of Array.from(files)) {
       try {
         const content = await readFileContent(file)
-        
-        // Determinar tipo de documento
+
         let type: UploadedCase['type'] = 'otro'
         const nameLower = file.name.toLowerCase()
+
         if (nameLower.includes('factura') || nameLower.includes('invoice')) {
           type = 'factura'
         } else if (nameLower.includes('poliza') || nameLower.includes('policy')) {
@@ -142,7 +238,6 @@ export function AIAgentChat() {
           type = 'reporte'
         }
 
-        // Simular delay de analisis
         await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000))
 
         const analysis = analyzeDocument(content, file.name)
@@ -163,6 +258,7 @@ export function AIAgentChat() {
     }
 
     setIsAnalyzing(false)
+
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -171,14 +267,17 @@ export function AIAgentChat() {
   const readFileContent = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
+
       reader.onload = (e) => {
         const result = e.target?.result
+
         if (typeof result === 'string') {
           resolve(result)
         } else {
           reject(new Error('Failed to read file'))
         }
       }
+
       reader.onerror = () => reject(reader.error)
       reader.readAsText(file)
     })
@@ -190,24 +289,29 @@ export function AIAgentChat() {
 
   const getRiskColor = (nivel: FraudAnalysis['nivelRiesgo']) => {
     switch (nivel) {
-      case 'ROJO': return 'text-[var(--risk-high)] bg-[var(--risk-high)]/10'
-      case 'AMARILLO': return 'text-[var(--risk-medium)] bg-[var(--risk-medium)]/10'
-      case 'VERDE': return 'text-[var(--risk-low)] bg-[var(--risk-low)]/10'
+      case 'ROJO':
+        return 'text-[var(--risk-high)] bg-[var(--risk-high)]/10'
+      case 'AMARILLO':
+        return 'text-[var(--risk-medium)] bg-[var(--risk-medium)]/10'
+      case 'VERDE':
+        return 'text-[var(--risk-low)] bg-[var(--risk-low)]/10'
     }
   }
 
   const getRiskIcon = (nivel: FraudAnalysis['nivelRiesgo']) => {
     switch (nivel) {
-      case 'ROJO': return <AlertCircle className="w-4 h-4" />
-      case 'AMARILLO': return <AlertTriangle className="w-4 h-4" />
-      case 'VERDE': return <CheckCircle className="w-4 h-4" />
+      case 'ROJO':
+        return <AlertCircle className="w-4 h-4" />
+      case 'AMARILLO':
+        return <AlertTriangle className="w-4 h-4" />
+      case 'VERDE':
+        return <CheckCircle className="w-4 h-4" />
     }
   }
 
   return (
     <div className="p-6 h-[calc(100vh-2rem)]">
       <div className="flex flex-col h-full max-w-5xl mx-auto gap-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -226,6 +330,7 @@ export function AIAgentChat() {
               <MessageSquare className="w-4 h-4" />
               Chat IA
             </TabsTrigger>
+
             <TabsTrigger value="upload" className="gap-2">
               <Upload className="w-4 h-4" />
               Analizar Documentos
@@ -238,7 +343,6 @@ export function AIAgentChat() {
           </TabsList>
 
           <TabsContent value="chat" className="flex-1 flex flex-col mt-4">
-            {/* Chat Container */}
             <Card className="flex-1 flex flex-col overflow-hidden">
               <CardHeader className="border-b border-border py-3">
                 <div className="flex items-center justify-between">
@@ -246,10 +350,12 @@ export function AIAgentChat() {
                     <Sparkles className="w-4 h-4" />
                     <span>El agente tiene acceso al analisis completo de 500 siniestros</span>
                   </div>
+
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-xs">
                       {messages.length} mensajes
                     </Badge>
+
                     {messages.length > 0 && (
                       <Button variant="outline" size="sm" onClick={clearChat}>
                         <RefreshCw className="w-4 h-4 mr-1" />
@@ -261,12 +367,12 @@ export function AIAgentChat() {
               </CardHeader>
 
               <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/* Welcome Message */}
                 {messages.length === 0 && (
                   <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
                     <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                       <MessageSquare className="w-8 h-8 text-primary" />
                     </div>
+
                     <div>
                       <h3 className="text-lg font-medium">Bienvenido al Agente Antifraude</h3>
                       <p className="text-sm text-muted-foreground mt-1 max-w-md">
@@ -275,16 +381,18 @@ export function AIAgentChat() {
                       </p>
                     </div>
 
-                    {/* Suggested Questions */}
                     <div className="w-full max-w-2xl">
-                      <p className="text-xs text-muted-foreground mb-3">Preguntas sugeridas:</p>
-                      <div className="grid grid-cols-2 gap-2">
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Preguntas sugeridas:
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {PREGUNTAS_SUGERIDAS.slice(0, 4).map((pregunta, i) => (
                           <Button
                             key={i}
                             variant="outline"
                             size="sm"
-                            className="justify-start text-left h-auto py-2 px-3 text-xs"
+                            className="justify-start text-left h-auto min-h-[48px] py-2 px-3 text-xs whitespace-normal leading-snug break-words"
                             onClick={() => handleSuggestedQuestion(pregunta)}
                           >
                             {pregunta}
@@ -293,7 +401,6 @@ export function AIAgentChat() {
                       </div>
                     </div>
 
-                    {/* Disclaimer */}
                     <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-4 py-2 rounded-lg">
                       <AlertTriangle className="w-4 h-4 text-[var(--risk-medium)]" />
                       Este agente genera alertas de revision, NO acusaciones de fraude.
@@ -301,7 +408,6 @@ export function AIAgentChat() {
                   </div>
                 )}
 
-                {/* Messages */}
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -324,8 +430,14 @@ export function AIAgentChat() {
                           : 'bg-muted'
                       )}
                     >
-                      <div className="text-sm whitespace-pre-wrap leading-relaxed prose prose-sm max-w-none dark:prose-invert">
-                        {message.content}
+                      <div className="text-sm leading-relaxed">
+                        {message.role === 'assistant' ? (
+                          <MarkdownMessage content={message.content} />
+                        ) : (
+                          <span className="whitespace-pre-wrap">
+                            {message.content}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -337,18 +449,27 @@ export function AIAgentChat() {
                   </div>
                 ))}
 
-                {/* Loading indicator */}
                 {isLoading && (
                   <div className="flex gap-3 justify-start">
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                       <Bot className="w-4 h-4 text-primary" />
                     </div>
+
                     <div className="bg-muted rounded-lg px-4 py-3">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <div className="flex gap-1">
-                          <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+                          <span
+                            className="w-2 h-2 rounded-full bg-primary animate-bounce"
+                            style={{ animationDelay: '0ms' }}
+                          />
+                          <span
+                            className="w-2 h-2 rounded-full bg-primary animate-bounce"
+                            style={{ animationDelay: '150ms' }}
+                          />
+                          <span
+                            className="w-2 h-2 rounded-full bg-primary animate-bounce"
+                            style={{ animationDelay: '300ms' }}
+                          />
                         </div>
                         <span>Analizando...</span>
                       </div>
@@ -359,9 +480,7 @@ export function AIAgentChat() {
                 <div ref={messagesEndRef} />
               </CardContent>
 
-              {/* Input Area */}
               <div className="border-t border-border p-4">
-                {/* Quick Actions */}
                 {messages.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-3">
                     {PREGUNTAS_SUGERIDAS.slice(0, 3).map((pregunta, i) => (
@@ -369,7 +488,7 @@ export function AIAgentChat() {
                         key={i}
                         variant="outline"
                         size="sm"
-                        className="text-xs"
+                        className="text-xs h-auto min-h-[36px] whitespace-normal leading-snug text-left justify-start max-w-[280px]"
                         onClick={() => handleSuggestedQuestion(pregunta)}
                         disabled={isLoading}
                       >
@@ -387,6 +506,7 @@ export function AIAgentChat() {
                     disabled={isLoading}
                     className="flex-1"
                   />
+
                   <Button type="submit" disabled={isLoading || !inputValue.trim()}>
                     <Send className="w-4 h-4" />
                   </Button>
@@ -403,6 +523,7 @@ export function AIAgentChat() {
                     <FileText className="w-4 h-4" />
                     <span>Sube facturas, polizas o reportes para analisis de fraude</span>
                   </div>
+
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -412,6 +533,7 @@ export function AIAgentChat() {
                     className="hidden"
                     id="file-upload"
                   />
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -439,6 +561,7 @@ export function AIAgentChat() {
                     <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
                       <Upload className="w-8 h-8 text-muted-foreground" />
                     </div>
+
                     <div>
                       <h3 className="text-lg font-medium">Sube documentos para analizar</h3>
                       <p className="text-sm text-muted-foreground mt-1 max-w-md">
@@ -447,6 +570,7 @@ export function AIAgentChat() {
                         automaticamente en busca de posibles irregularidades.
                       </p>
                     </div>
+
                     <div className="flex flex-wrap gap-2 justify-center">
                       <Badge variant="outline">.txt</Badge>
                       <Badge variant="outline">.csv</Badge>
@@ -461,14 +585,21 @@ export function AIAgentChat() {
                         <div className="p-4">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-start gap-3">
-                              <div className={cn(
-                                'w-10 h-10 rounded-lg flex items-center justify-center',
-                                caseItem.analysis ? getRiskColor(caseItem.analysis.nivelRiesgo) : 'bg-muted'
-                              )}>
-                                {caseItem.analysis ? getRiskIcon(caseItem.analysis.nivelRiesgo) : (
+                              <div
+                                className={cn(
+                                  'w-10 h-10 rounded-lg flex items-center justify-center',
+                                  caseItem.analysis
+                                    ? getRiskColor(caseItem.analysis.nivelRiesgo)
+                                    : 'bg-muted'
+                                )}
+                              >
+                                {caseItem.analysis ? (
+                                  getRiskIcon(caseItem.analysis.nivelRiesgo)
+                                ) : (
                                   <FileText className="w-5 h-5" />
                                 )}
                               </div>
+
                               <div>
                                 <div className="flex items-center gap-2">
                                   <h4 className="font-medium">{caseItem.fileName}</h4>
@@ -476,11 +607,13 @@ export function AIAgentChat() {
                                     {caseItem.type}
                                   </Badge>
                                 </div>
+
                                 <p className="text-xs text-muted-foreground mt-1">
                                   Subido: {caseItem.uploadedAt.toLocaleString()}
                                 </p>
                               </div>
                             </div>
+
                             <Button
                               variant="ghost"
                               size="icon"
@@ -493,7 +626,6 @@ export function AIAgentChat() {
 
                           {caseItem.analysis && (
                             <div className="mt-4 space-y-4">
-                              {/* Score y nivel */}
                               <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm text-muted-foreground">Score:</span>
@@ -502,15 +634,17 @@ export function AIAgentChat() {
                                   </span>
                                   <span className="text-sm text-muted-foreground">/100</span>
                                 </div>
-                                <Badge className={cn(
-                                  'text-sm',
-                                  getRiskColor(caseItem.analysis.nivelRiesgo)
-                                )}>
+
+                                <Badge
+                                  className={cn(
+                                    'text-sm',
+                                    getRiskColor(caseItem.analysis.nivelRiesgo)
+                                  )}
+                                >
                                   {caseItem.analysis.nivelRiesgo}
                                 </Badge>
                               </div>
 
-                              {/* Alertas */}
                               <div>
                                 <h5 className="text-sm font-medium mb-2">Alertas detectadas:</h5>
                                 <div className="flex flex-wrap gap-2">
@@ -520,7 +654,8 @@ export function AIAgentChat() {
                                       variant="outline"
                                       className={cn(
                                         'text-xs',
-                                        alerta.toLowerCase().includes('alto') || alerta.toLowerCase().includes('restrictiva')
+                                        alerta.toLowerCase().includes('alto') ||
+                                        alerta.toLowerCase().includes('restrictiva')
                                           ? 'border-[var(--risk-high)] text-[var(--risk-high)]'
                                           : ''
                                       )}
@@ -531,7 +666,6 @@ export function AIAgentChat() {
                                 </div>
                               </div>
 
-                              {/* Recomendaciones */}
                               <div>
                                 <h5 className="text-sm font-medium mb-2">Recomendaciones:</h5>
                                 <ul className="text-sm text-muted-foreground space-y-1">
@@ -544,7 +678,6 @@ export function AIAgentChat() {
                                 </ul>
                               </div>
 
-                              {/* Explicacion */}
                               <div className="bg-muted/50 rounded-lg p-3">
                                 <h5 className="text-sm font-medium mb-2">Analisis detallado:</h5>
                                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">

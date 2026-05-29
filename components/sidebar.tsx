@@ -20,9 +20,11 @@ import {
   Brain,
   TrendingDown,
   Code2,
+  FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { dashboardStats } from '@/lib/data'
+import { useUploadedCases } from '@/hooks/use-uploaded-cases'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -44,6 +46,16 @@ interface SidebarProps {
 export function Sidebar({ children }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
+  const uploadedCases = useUploadedCases()
+
+  const documentosSubidos = uploadedCases.length
+
+  const casosRojosSubidos = uploadedCases.filter(
+    uploadedCase => uploadedCase.analysis?.nivelRiesgo === 'ROJO'
+  ).length
+
+  const totalCasos = dashboardStats.totalSiniestros + documentosSubidos
+  const totalCasosRojos = dashboardStats.casosRojos + casosRojosSubidos
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -60,6 +72,7 @@ export function Sidebar({ children }: SidebarProps) {
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10">
               <Shield className="w-5 h-5 text-primary" />
             </div>
+
             {!collapsed && (
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-sidebar-foreground">
@@ -77,6 +90,7 @@ export function Sidebar({ children }: SidebarProps) {
         <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
           {navigation.map((item) => {
             const isActive = pathname === item.href
+
             return (
               <Link
                 key={item.name}
@@ -105,16 +119,32 @@ export function Sidebar({ children }: SidebarProps) {
                   Casos Rojos
                 </span>
                 <span className="font-medium text-[var(--risk-high)]">
-                  {dashboardStats.casosRojos}
+                  {totalCasosRojos}
                 </span>
               </div>
+
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-2 text-muted-foreground">
                   <Users className="w-4 h-4 text-primary" />
                   Total Casos
                 </span>
-                <span className="font-medium">{dashboardStats.totalSiniestros}</span>
+                <span className="font-medium">
+                  {totalCasos}
+                </span>
               </div>
+
+              {documentosSubidos > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <FileText className="w-4 h-4 text-primary" />
+                    Docs. Subidos
+                  </span>
+                  <span className="font-medium text-primary">
+                    +{documentosSubidos}
+                  </span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-2 text-muted-foreground">
                   <Building2 className="w-4 h-4 text-[var(--risk-medium)]" />
