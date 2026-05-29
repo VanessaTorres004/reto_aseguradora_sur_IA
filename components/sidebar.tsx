@@ -21,10 +21,12 @@ import {
   TrendingDown,
   Code2,
   FileText,
+  LogOut,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { dashboardStats } from '@/lib/data'
 import { useUploadedCases } from '@/hooks/use-uploaded-cases'
+import { useAuth } from '@/hooks/use-auth'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -47,6 +49,13 @@ export function Sidebar({ children }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
   const uploadedCases = useUploadedCases()
+  const { user, logout } = useAuth()
+
+  const handleLogout = async () => {
+    localStorage.removeItem('auth_session')
+    await logout()
+    window.location.href = '/login'
+  }
 
   const documentosSubidos = uploadedCases.length
 
@@ -155,6 +164,46 @@ export function Sidebar({ children }: SidebarProps) {
                 </span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* User + Logout */}
+        {user && (
+          <div className="px-3 py-3 border-t border-sidebar-border">
+            {collapsed ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                onClick={handleLogout}
+                title="Cerrar sesion"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-1">
+                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/20 shrink-0">
+                    <span className="text-xs font-bold text-primary">
+                      {user.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-sidebar-foreground truncate">{user.name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{user.role}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="w-4 h-4" />
+                  Cerrar sesion
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

@@ -1,15 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth, useProtectedFetch } from '@/hooks/use-auth'
+import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { LogOut, LogIn, AlertCircle } from 'lucide-react'
+import { LogIn, AlertCircle } from 'lucide-react'
 
 export function LoginForm() {
-  const { isAuthenticated, user, loading, error, login, logout } = useAuth()
+  const { loading, error, login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -22,18 +22,13 @@ export function LoginForm() {
 
     try {
       await login(email, password)
-      setEmail('')
-      setPassword('')
+      // Full-page navigation so AuthGuard reads fresh session from localStorage
+      window.location.href = '/'
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Login failed'
       setLocalError(msg)
-    } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleLogout = async () => {
-    await logout()
   }
 
   // Demo users
@@ -42,39 +37,6 @@ export function LoginForm() {
     { email: 'analista@aseguradora.com', password: 'demo123', label: 'Analista (Acceso Modificado)' },
     { email: 'usuario@aseguradora.com', password: 'demo123', label: 'Usuario (Acceso Limitado)' },
   ]
-
-  if (isAuthenticated && user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <Card className="max-w-md mx-auto mt-8">
-          <div className="p-6 space-y-4">
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <p className="text-sm font-medium text-green-900">✓ Sesión Activa</p>
-              <p className="text-lg font-bold text-green-900 mt-1">{user.name}</p>
-              <p className="text-sm text-green-700">{user.email}</p>
-              <div className="mt-3 inline-block bg-green-200 text-green-900 text-xs font-semibold px-3 py-1 rounded-full">
-                {user.role}
-              </div>
-            </div>
-
-            <p className="text-sm text-gray-600 mt-4">
-              Los datos ahora estarán enmascarados según tu rol.
-            </p>
-
-            <Button
-              onClick={handleLogout}
-              variant="destructive"
-              className="w-full"
-              disabled={loading}
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Cerrar Sesión
-            </Button>
-          </div>
-        </Card>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
