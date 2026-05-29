@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { siniestros, filterSiniestros } from '@/lib/data'
 import type { RiskLevel } from '@/lib/data'
+import { requireAuth, MaskLevel } from '@/lib/security/auth'
+import { applyMaskingByLevel, PII_MASK_CONFIG } from '@/lib/security/pii-masking'
+import { logAuditEvent } from '@/lib/security/audit-log'
 
 /**
  * GET /api/siniestros
+ *
+ * Headers:
+ *   - Authorization: Bearer <token>  (required)
  *
  * Query parameters:
  *   - nivelRiesgo: 'ROJO' | 'AMARILLO' | 'VERDE'
@@ -19,6 +25,43 @@ import type { RiskLevel } from '@/lib/data'
  */
 export async function GET(request: NextRequest) {
   try {
+    // ===== AUTENTICACIÓN =====
+    const authHeader = request.headers.get('authorization')
+    const token = authHeader?.replace('Bearer ', '')
+
+    if (!token) {
+      logAuditEvent({
+        userId: 'anonymous',
+        userEmail: 'anonymous',
+        action: 'VIEW_CASE',
+        resource: 'api/siniestros',
+        details: { error: 'No token provided' },
+        status: 'FAILED',
+        riskLevel: 'HIGH',
+      })
+      return NextResponse.json(
+        { ok: false, error: 'Unauthorized: missing token' },
+        { status: 401 }
+      )
+    }
+
+    const user = requireAuth(token)
+    if (!user) {
+      logAuditEvent({
+        userId: 'unknown',
+        userEmail: 'unknown',
+        action: 'VIEW_CASE',
+        resource: 'api/siniestros',
+        details: { error: 'Invalid token' },
+        status: 'FAILED',
+        riskLevel: 'HIGH',
+      })
+      return NextResponse.json(
+        { ok: false, error: 'Unauthorized: invalid token' },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = request.nextUrl
 
     const nivelRiesgo = searchParams.get('nivelRiesgo') as RiskLevel | null
@@ -29,6 +72,9 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0', 10)
     const sort = searchParams.get('sort') || 'score'
     const order = searchParams.get('order') || 'desc'
+
+    // ===== AUTORIZACIÓN Y MAPEO DE MASKINGLEVEL =====
+    const maskLevel: MaskLevel = user.role === 'AUDITOR' ? 'AUDITOR' : user.role === 'ANALYST' ? 'AUTHENTICATED' : 'PUBLIC'
 
     let data = filterSiniestros(siniestros, {
       nivelRiesgo: nivelRiesgo ?? undefined,
@@ -49,18 +95,57 @@ export async function GET(request: NextRequest) {
     const total = data.length
     const paginated = data.slice(offset, offset + limit)
 
+    // ===== ENMASCARAMIENTO DE PII SEGÚN ROL =====
+    const maskedData = paginated.map(caso => ({
+      ...caso,
+      // Enmascarar datos sensibles del asegurado
+      idAsegurado: maskLevel === 'AUDITOR' ? caso.idAsegurado : applyMaskingByLevel({ documento: caso.idAsegurado }, maskLevel).documento,
+    }))
+
+    // ===== AUDITORÍA =====
+    logAuditEvent({
+      userId: user.id,
+      userEmail: user.email,
+      action: 'VIEW_CASE',
+      resource: `api/siniestros?nivelRiesgo=${nivelRiesgo}`,
+      details: { 
+        filters: { nivelRiesgo, ramo, sucursal, search },
+        limit,
+        offset,
+        returned: maskedData.length,
+        total,
+        role: user.role,
+      },
+      status: 'SUCCESS',
+      riskLevel: 'LOW',
+    })
+
     return NextResponse.json({
       ok: true,
       meta: {
         total,
         limit,
         offset,
-        returned: paginated.length,
+        returned: maskedData.length,
         filters: { nivelRiesgo, ramo, sucursal, search },
+        user: {
+          email: user.email,
+          role: user.role,
+        },
       },
-      data: paginated,
+      data: maskedData,
     })
   } catch (err) {
-    return NextResponse.json({ ok: false, error: 'Internal server error' }, { status: 500 })
+    const errorMsg = err instanceof Error ? err.message : 'Internal server error'
+    logAuditEvent({
+      userId: 'system',
+      userEmail: 'system',
+      action: 'VIEW_CASE',
+      resource: 'api/siniestros',
+      details: { error: errorMsg },
+      status: 'FAILED',
+      riskLevel: 'MEDIUM',
+    })
+    return NextResponse.json({ ok: false, error: errorMsg }, { status: 500 })
   }
 }
