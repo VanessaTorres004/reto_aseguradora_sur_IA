@@ -60,7 +60,7 @@ export function Sidebar({ children }: SidebarProps) {
   const documentosSubidos = uploadedCases.length
 
   const casosRojosSubidos = uploadedCases.filter(
-    (uploadedCase) => uploadedCase.analysis?.nivelRiesgo === 'ROJO'
+    uploadedCase => uploadedCase.analysis?.nivelRiesgo === 'ROJO'
   ).length
 
   const totalCasos = dashboardStats.totalSiniestros + documentosSubidos
@@ -167,14 +167,14 @@ export function Sidebar({ children }: SidebarProps) {
           </div>
         )}
 
-        {/* User Profile + Logout */}
+        {/* User + Logout */}
         {user && (
           <div className="px-3 py-3 border-t border-sidebar-border">
             {collapsed ? (
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full justify-center text-muted-foreground hover:text-destructive"
+                className="w-full justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                 onClick={handleLogout}
                 title="Cerrar sesion"
               >
@@ -184,17 +184,13 @@ export function Sidebar({ children }: SidebarProps) {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-1">
                   <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/20 shrink-0">
-                    <span className="text-xs font-semibold text-primary">
+                    <span className="text-xs font-bold text-primary">
                       {user.name.charAt(0).toUpperCase()}
                     </span>
                   </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-medium text-sidebar-foreground truncate">
-                      {user.name}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground truncate">
-                      {user.role}
-                    </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-sidebar-foreground truncate">{user.name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{user.role}</p>
                   </div>
                 </div>
                 <Button

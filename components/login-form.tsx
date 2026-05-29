@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { LogIn, AlertCircle } from 'lucide-react'
 
 export function LoginForm() {
-  const { error, login } = useAuth()
+  const { loading, error, login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -22,15 +22,16 @@ export function LoginForm() {
 
     try {
       await login(email, password)
+      // Full-page navigation so AuthGuard reads fresh session from localStorage
       window.location.href = '/'
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Login failed'
       setLocalError(msg)
-    } finally {
       setIsLoading(false)
     }
   }
 
+  // Demo users
   const demoUsers = [
     { email: 'auditor@aseguradora.com', password: 'demo123', label: 'Auditor (Acceso Total)' },
     { email: 'analista@aseguradora.com', password: 'demo123', label: 'Analista (Acceso Modificado)' },
@@ -38,15 +39,15 @@ export function LoginForm() {
   ]
 
   return (
-    <div className="min-h-screen bg-background p-4 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
       <Card className="max-w-md w-full">
         <div className="p-8 space-y-6">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Sistema Seguro</h1>
-            <p className="text-sm text-muted-foreground mt-1">Deteccion de Fraude en Seguros</p>
+            <h1 className="text-2xl font-bold text-gray-900">Sistema Seguro</h1>
+            <p className="text-sm text-gray-500 mt-1">Detección de Fraude en Seguros</p>
           </div>
 
-          {(error || localError) && (
+          {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error || localError}</AlertDescription>
@@ -55,7 +56,7 @@ export function LoginForm() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email
               </label>
               <Input
@@ -68,8 +69,8 @@ export function LoginForm() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Contrasena
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Contraseña
               </label>
               <Input
                 type="password"
@@ -86,31 +87,31 @@ export function LoginForm() {
               disabled={isLoading || !email || !password}
             >
               <LogIn className="w-4 h-4 mr-2" />
-              {isLoading ? 'Iniciando sesion...' : 'Iniciar Sesion'}
+              {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </form>
 
-          <div className="space-y-2 border-t border-border pt-4">
-            <p className="text-xs font-medium text-muted-foreground uppercase">Usuarios de Prueba:</p>
-            {demoUsers.map((demoUser) => (
+          <div className="space-y-2 border-t pt-4">
+            <p className="text-xs font-medium text-gray-600 uppercase">Usuarios de Prueba:</p>
+            {demoUsers.map((user) => (
               <button
-                key={demoUser.email}
+                key={user.email}
                 onClick={() => {
-                  setEmail(demoUser.email)
-                  setPassword(demoUser.password)
+                  setEmail(user.email)
+                  setPassword(user.password)
                 }}
-                className="w-full text-left p-2 text-xs border border-border rounded hover:bg-accent transition"
+                className="w-full text-left p-2 text-xs border border-gray-200 rounded hover:bg-gray-50 transition"
               >
-                <div className="font-mono text-foreground">{demoUser.email}</div>
-                <div className="text-muted-foreground text-xs">{demoUser.label}</div>
+                <div className="font-mono text-gray-700">{user.email}</div>
+                <div className="text-gray-500 text-xs">{user.label}</div>
               </button>
             ))}
           </div>
 
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs">
-              Este es un sistema de demostracion. Los datos estan protegidos segun el rol del usuario.
+          <Alert className="bg-blue-50 border-blue-200">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-xs text-blue-900">
+              Este es un sistema de demostración. Los datos están protegidos según el rol del usuario.
             </AlertDescription>
           </Alert>
         </div>
