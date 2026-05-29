@@ -20,7 +20,7 @@ export interface AuditLog {
   userEmail: string
   action: AuditAction
   resource: string // ID del recurso accedido
-  details: Record<string, any>
+  details: Record<string, unknown>
   ipAddress?: string
   userAgent?: string
   status: 'SUCCESS' | 'FAILED'
@@ -38,7 +38,7 @@ const MAX_LOGS = 10000
 export function logAuditEvent(event: Omit<AuditLog, 'id' | 'timestamp'>): AuditLog {
   const auditLog: AuditLog = {
     ...event,
-    id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
     timestamp: new Date(),
   }
 
@@ -76,20 +76,25 @@ export function getAuditLogs(
 ): AuditLog[] {
   let result = [...auditLogs]
 
-  if (filter?.userId) {
-    result = result.filter(log => log.userId === filter.userId)
+  const userId = filter?.userId
+  const action = filter?.action
+  const riskLevel = filter?.riskLevel
+  const since = filter?.since
+
+  if (userId) {
+    result = result.filter((log) => log.userId === userId)
   }
 
-  if (filter?.action) {
-    result = result.filter(log => log.action === filter.action)
+  if (action) {
+    result = result.filter((log) => log.action === action)
   }
 
-  if (filter?.riskLevel) {
-    result = result.filter(log => log.riskLevel === filter.riskLevel)
+  if (riskLevel) {
+    result = result.filter((log) => log.riskLevel === riskLevel)
   }
 
-  if (filter?.since) {
-    result = result.filter(log => log.timestamp >= filter.since)
+  if (since) {
+    result = result.filter((log) => log.timestamp >= since)
   }
 
   return result.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
@@ -100,7 +105,8 @@ export function getAuditLogs(
  */
 export function exportAuditLogsAsCSV(): string {
   const headers = ['Timestamp', 'User', 'Action', 'Resource', 'Status', 'Risk Level']
-  const rows = auditLogs.map(log => [
+
+  const rows = auditLogs.map((log) => [
     log.timestamp.toISOString(),
     log.userEmail,
     log.action,
@@ -111,7 +117,11 @@ export function exportAuditLogsAsCSV(): string {
 
   const csv = [
     headers.join(','),
-    ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
+    ...rows.map((row) =>
+      row
+        .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+        .join(',')
+    ),
   ].join('\n')
 
   return csv
@@ -125,7 +135,8 @@ export function cleanOldAuditLogs(days: number = 90): number {
   cutoffDate.setDate(cutoffDate.getDate() - days)
 
   const initialLength = auditLogs.length
-  const filtered = auditLogs.filter(log => log.timestamp > cutoffDate)
+  const filtered = auditLogs.filter((log) => log.timestamp > cutoffDate)
+
   auditLogs.length = 0
   auditLogs.push(...filtered)
 
@@ -138,7 +149,7 @@ export function cleanOldAuditLogs(days: number = 90): number {
 export function getAuditStats() {
   const stats = {
     totalLogs: auditLogs.length,
-    uniqueUsers: new Set(auditLogs.map(log => log.userId)).size,
+    uniqueUsers: new Set(auditLogs.map((log) => log.userId)).size,
     actionCounts: {} as Record<AuditAction, number>,
     riskDistribution: { LOW: 0, MEDIUM: 0, HIGH: 0 },
     last24Hours: 0,

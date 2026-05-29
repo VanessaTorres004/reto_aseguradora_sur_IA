@@ -18,6 +18,21 @@ export interface Session {
   token: string
 }
 
+/**
+ * Niveles de visibilidad/enmascaramiento según autenticación y rol.
+ *
+ * PUBLIC: datos más protegidos o enmascarados
+ * AUTHENTICATED: usuario autenticado con visibilidad parcial
+ * AUDITOR: auditor con visibilidad completa
+ */
+export const MaskLevel = {
+  PUBLIC: 'PUBLIC',
+  AUTHENTICATED: 'AUTHENTICATED',
+  AUDITOR: 'AUDITOR',
+} as const
+
+export type MaskLevel = typeof MaskLevel[keyof typeof MaskLevel]
+
 // Simulación de usuarios autenticados
 const authenticatedUsers = new Map<string, Session>()
 
@@ -59,6 +74,7 @@ export function validateSession(token: string): Session | null {
   const session = authenticatedUsers.get(token)
 
   if (!session) return null
+
   if (session.expiresAt < new Date()) {
     authenticatedUsers.delete(token)
     return null
@@ -79,6 +95,7 @@ export function getCurrentSession(): Session | null {
  */
 export function logout(token: string): void {
   authenticatedUsers.delete(token)
+
   if (currentSession?.token === token) {
     currentSession = null
   }
@@ -88,7 +105,7 @@ export function logout(token: string): void {
  * Genera un token de sesión seguro
  */
 function generateSessionToken(): string {
-  return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  return `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
 }
 
 /**

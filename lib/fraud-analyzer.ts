@@ -175,7 +175,7 @@ function extractProvider(content: string): string | undefined {
     'caso:',
   ]
 
-  const explicitBeforeRuc = content.match(/^(.+?)\s+Servicios.*?RUC:/is)
+  const explicitBeforeRuc = content.match(/^([\s\S]+?)\s+Servicios[\s\S]*?RUC:/i)
 
   if (explicitBeforeRuc?.[1]) {
     const provider = cleanLine(explicitBeforeRuc[1].split('\n')[0])

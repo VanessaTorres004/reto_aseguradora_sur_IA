@@ -306,9 +306,8 @@ export function AnalyticsDashboard() {
                       data={alertasTreemap}
                       dataKey="value"
                       nameKey="name"
-                      aspectRatio={4/1}
+                      aspectRatio={4 / 1}
                       stroke="var(--background)"
-                      strokeWidth={2}
                     >
                       <Tooltip
                         contentStyle={{

@@ -67,7 +67,22 @@ function calculateMontoStats() {
  */
 function esMontoAnomalía(monto: number): boolean {
   const stats = calculateMontoStats()
+
+  if (
+    stats.q1 === undefined ||
+    stats.q3 === undefined ||
+    !Number.isFinite(stats.q1) ||
+    !Number.isFinite(stats.q3)
+  ) {
+    return false
+  }
+
   const iqr = stats.q3 - stats.q1
+
+  if (!Number.isFinite(iqr) || iqr <= 0) {
+    return false
+  }
+
   const lowerBound = stats.q1 - 1.5 * iqr
   const upperBound = stats.q3 + 1.5 * iqr
 

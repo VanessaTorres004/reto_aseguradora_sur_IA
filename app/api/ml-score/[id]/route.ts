@@ -5,18 +5,18 @@ import { logAuditEvent } from '@/lib/security/audit-log'
 
 /**
  * GET /api/ml-score/:siniestroId
- * 
+ *
  * Calcula el score de ML para un siniestro específico usando:
  * - Regresión Logística (70%)
  * - Detección de Anomalías (30%)
- * 
+ *
  * Features utilizadas:
  * - Montos (normalización, Z-score, anomalías)
  * - Proveedor (riesgo histórico, lista restrictiva)
  * - Asegurado (tasa de fraude histórica, reclamos)
  * - Temporal (días desde último reclamo, reclamos recientes)
  * - Documentación y patrones
- * 
+ *
  * Headers:
  *   - Authorization: Bearer <token>  (required)
  */
@@ -37,6 +37,7 @@ export async function GET(
     }
 
     const user = requireAuth(token)
+
     if (!user) {
       return NextResponse.json(
         { ok: false, error: 'Unauthorized: invalid token' },
@@ -66,6 +67,12 @@ export async function GET(
       )
     }
 
+    // Quitamos siniestroId de mlAnalysis para evitar duplicarlo en la respuesta
+    const {
+      siniestroId: siniestroIdFromAnalysis,
+      ...mlAnalysisWithoutId
+    } = mlAnalysis
+
     // ===== AUDITORÍA =====
     logAuditEvent({
       userId: user.id,
@@ -84,13 +91,16 @@ export async function GET(
     return NextResponse.json({
       ok: true,
       data: {
-        siniestroId,
-        ...mlAnalysis,
+        siniestroId: siniestroIdFromAnalysis ?? siniestroId,
+        ...mlAnalysisWithoutId,
         modelo: {
           nombre: 'Ensemble ML',
-          componentes: ['Regresión Logística (70%)', 'Detección de Anomalías (30%)'],
+          componentes: [
+            'Regresión Logística (70%)',
+            'Detección de Anomalías (30%)',
+          ],
           features: 16,
-          descripción: 'Modelo entrenado con datos históricos de reclamaciones',
+          descripcion: 'Modelo entrenado con datos históricos de reclamaciones',
         },
       },
       meta: {
@@ -111,6 +121,9 @@ export async function GET(
       riskLevel: 'MEDIUM',
     })
 
-    return NextResponse.json({ ok: false, error: errorMsg }, { status: 500 })
+    return NextResponse.json(
+      { ok: false, error: errorMsg },
+      { status: 500 }
+    )
   }
 }
