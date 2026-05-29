@@ -3,6 +3,9 @@
 // En producción, este módulo debería integrarse con un modelo ML real,
 // extracción documental robusta y una base de datos centralizada.
 
+import { ensembleMLScore, explainMLScore, extractMLFeatures } from '@/lib/ml-fraud-detector'
+import { siniestros } from '@/lib/data'
+
 export interface UploadedCase {
   id: string
   fileName: string
@@ -534,4 +537,51 @@ export function generateAIResponse(userMessage: string): string {
   }
 
   return `Puedo ayudarte a revisar casos, explicar alertas, analizar documentos subidos y priorizar siniestros que requieren revisión humana. Este sistema genera alertas de revisión, no acusaciones de fraude.`
+}
+
+/**
+ * Analiza un siniestro del dataset usando ML
+ * Utiliza Regresión Logística + Detección de Anomalías
+ */
+export function analyzeSiniestroWithML(siniestroId: string) {
+  const siniestro = siniestros.find(s => s.id === siniestroId)
+
+  if (!siniestro) {
+    return null
+  }
+
+  // Calcular ML score
+  const mlScore = ensembleMLScore(siniestro)
+
+  // Extraer features para explicabilidad
+  const features = extractMLFeatures(siniestro)
+  const probabilidad = mlScore / 100
+  const { explanation, topFactors } = explainMLScore(features, probabilidad)
+
+  return {
+    siniestroId,
+    scoreML: mlScore,
+    probabilidadFraude: probabilidad,
+    explicacion: explanation,
+    topFactors,
+    features: {
+      montoNormalizado: features.montoNormalizado,
+      montoEsAnomalía: features.montoEsAnomalía,
+      proveedorRiesgo: features.proveedorRiesgoHistórico,
+      aseguradoRiesgo: features.aseguradoTasaFraude,
+      reclamsRecientes: features.reclamsEnÚltimos30Días,
+    },
+  }
+}
+
+/**
+ * Recalcula los scores con ML para todos los siniestros
+ * (Para demostración - en producción esto sería batch job)
+ */
+export function recalculatAllSiniestrosWithML() {
+  return siniestros.map(siniestro => ({
+    id: siniestro.id,
+    scoreML: ensembleMLScore(siniestro),
+    nivelRiesgoML: siniestro.scoreFinal >= 76 ? 'ROJO' : siniestro.scoreFinal >= 41 ? 'AMARILLO' : 'VERDE',
+  }))
 }

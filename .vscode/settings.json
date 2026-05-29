@@ -1,0 +1,22 @@
+{
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "xprotocol",
+                "enableSsl": "Disabled"
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "sshOptions": {
+                "port": 22
+            },
+            "driver": "MySQL",
+            "name": "shecodes",
+            "database": "aseguradora_sur_shecodes",
+            "username": "DESKTOP-2QECPKE\\hp",
+            "password": ""
+        }
+    ]
+}
