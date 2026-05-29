@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Sistema Antifraude | Aseguradora del Sur',
+  title: 'Sistema Antifraude | Aseguradora del Sur | She Codes',
 
   description:
     'Detector de Posibles Fraudes en Siniestros - hackIAthon 2026',
